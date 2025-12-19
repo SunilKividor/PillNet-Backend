@@ -20,7 +20,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, handlers *handler.Handler
 	}
 
 	authRequired := v1.Group("/")
-	v1.Use(middleware)
+	// v1.Use(middleware)
 	{
 		authRequired.POST("/logout", handlers.Authentication.Logout)
 
@@ -62,5 +62,8 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, handlers *handler.Handler
 		authRequired.DELETE("/inventory/transaction", handlers.InventoryTransaction.DeleteInventoryTransactionByID)
 
 		//alerts
+		authRequired.POST("/alerts", handlers.Alert.CreateAlert)
+		authRequired.GET("/alerts", handlers.Alert.GetAlerts)
+		authRequired.DELETE("/alerts", handlers.Alert.DeleteAlertByID)
 	}
 }

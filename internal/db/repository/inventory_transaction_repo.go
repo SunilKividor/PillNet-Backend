@@ -17,8 +17,8 @@ func (i *InventoryTransactionRepository) CreateInventoryTransaction(ctx context.
 
 	smt := `INSERT INTO inventory_transactions(
 		medicine_id,batch_number,transaction_type,
-		from_location_id,to_location_id,unit_price,quantity,total_value,performed_by
-	) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`
+		from_location_id,to_location_id,unit_price,quantity,total_value,performed_by,inventory_id
+	) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`
 
 	var id uuid.UUID
 	err := db.QueryRow(
@@ -26,7 +26,7 @@ func (i *InventoryTransactionRepository) CreateInventoryTransaction(ctx context.
 		smt,
 		transaction.MedicineId, transaction.BatchNumber, transaction.TransactionType,
 		transaction.FromLocationId, transaction.ToLocationId, transaction.UnitPrice,
-		transaction.Quantity, transaction.TotalValue, transaction.PerformedBy,
+		transaction.Quantity, transaction.TotalValue, transaction.PerformedBy, transaction.InventoryStockId,
 	).Scan(&id)
 
 	if err != nil {

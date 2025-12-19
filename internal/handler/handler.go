@@ -8,4 +8,5 @@ type Handlers struct {
 	MedicineCategory     *MedicineCategoryHandler
 	Medicines            *MedicinesHandler
 	StorageLocation      *StorageLocationHandler
+	Alert                *AlertsHandler
 }

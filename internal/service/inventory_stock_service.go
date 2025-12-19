@@ -40,7 +40,7 @@ func (s *InventoryStockService) DeleteInventoryStockByIdService(ctx context.Cont
 	return err
 }
 
-func (s *InventoryStockService) GetInventoryStockWithFiltersService(ctx context.Context, filters *models.InventoryStockFilters) ([]models.InventoryStock, error) {
-	stock, err := s.InventoryStockRepo.GetInventoryStockWithFilters(ctx, s.DB, filters)
-	return stock, err
+func (s *InventoryStockService) GetInventoryStockWithFiltersService(ctx context.Context, filters *models.InventoryStockFilters) ([]models.InventoryStockResponse, int, error) {
+	stock, total, err := s.InventoryStockRepo.GetInventoryStockWithFilters(ctx, s.DB, filters)
+	return stock, total, err
 }

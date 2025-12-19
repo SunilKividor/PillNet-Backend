@@ -40,6 +40,7 @@ func InitializeApp() (*api.Server, error) {
 	medicineCategoryRepo := repository.NewMedicinesCategoryRepository()
 	medicineRepo := repository.NewMedicinesRepository()
 	storageLocationRepo := repository.NewStorageLocationRepository()
+	alertsRepo := repository.NewAlertsRepository()
 
 	inventoryTransactionService := service.NewInventoryTransactionService(pool, inventoryTransactionRepo)
 	inventoryStockService := service.NewInventoryStockService(pool, inventoryStockRepo)
@@ -47,6 +48,7 @@ func InitializeApp() (*api.Server, error) {
 	medicineCategoryService := service.NewMedicineCategoryService(pool, medicineCategoryRepo)
 	medicineService := service.NewMedicineService(pool, medicineRepo, medicineCategoryRepo, manufacturerRepo)
 	storageLocationService := service.NewStorageLocationService(pool, storageLocationRepo)
+	alertsService := service.NewAlertsService(pool, alertsRepo)
 
 	handlers := &handler.Handlers{
 		Authentication:       handler.NewAuthenticationHandler(jwtAuth),
@@ -56,6 +58,7 @@ func InitializeApp() (*api.Server, error) {
 		MedicineCategory:     handler.NewMedicineCategoryHandler(medicineCategoryService),
 		Medicines:            handler.NewMedicinesHandler(medicineService),
 		StorageLocation:      handler.NewStorageLocationHandler(storageLocationService),
+		Alert:                handler.NewAlertsHandler(alertsService),
 	}
 	middleware := middleware.JWTMiddleware()
 

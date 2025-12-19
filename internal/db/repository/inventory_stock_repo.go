@@ -7,6 +7,7 @@ import (
 
 	"github.com/SunilKividor/PillNet-Backend/internal/models"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type InventoryStockRepository struct{}
@@ -102,6 +103,35 @@ func (i *InventoryStockRepository) GetInventoryStock(ctx context.Context, db DBT
 	return inventory, nil
 }
 
+func (r *InventoryStockRepository) UpdateInventoryStockQuantity(
+	ctx context.Context,
+	db DBTX,
+	inventoryId string,
+	batchNumber string,
+	delta pgtype.Numeric,
+) error {
+
+	smt := `
+		UPDATE inventory_stock
+		SET 
+			quantity = quantity + $1,
+			updated_at = NOW()
+		WHERE id = $2
+		  AND batch_number = $3
+	`
+
+	cmd, err := db.Exec(ctx, smt, delta, inventoryId, batchNumber)
+	if err != nil {
+		return err
+	}
+
+	if cmd.RowsAffected() == 0 {
+		return fmt.Errorf("inventory stock not found")
+	}
+
+	return nil
+}
+
 func (i *InventoryStockRepository) DeleteInventoryStockById(ctx context.Context, db DBTX, id string) error {
 	smt := `DELETE * FROM inventory_stock WHERE id = $1`
 
@@ -109,141 +139,278 @@ func (i *InventoryStockRepository) DeleteInventoryStockById(ctx context.Context,
 	return err
 }
 
-func (i *InventoryStockRepository) GetInventoryStockWithFilters(ctx context.Context, db DBTX, filters *models.InventoryStockFilters) ([]models.InventoryStock, error) {
+func (r *InventoryStockRepository) GetInventoryStockWithFilters(
+	ctx context.Context,
+	db DBTX,
+	f *models.InventoryStockFilters,
+) ([]models.InventoryStockResponse, int, error) {
 
-	smt, args := buildStockQuery(filters)
-
-	rows, err := db.Query(ctx, smt, args...)
+	// ---- get data ----
+	dataQuery, args := buildStockQuery(f)
+	rows, err := db.Query(ctx, dataQuery, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
-	var inventory []models.InventoryStock
-
+	var data []models.InventoryStockResponse
 	for rows.Next() {
-		var stock models.InventoryStock
-		err := rows.Scan(
-			&stock.Id, &stock.MedicineID, &stock.BatchNumber,
-			&stock.Quantity, &stock.ReceivedQuantity, &stock.ReservedQuantity, &stock.DamagedQuantity,
-			&stock.ManufacturerDate, &stock.ExpiryDate, &stock.ReceivedDate,
-			&stock.UnitCostPrice, &stock.UnitSellingPrice, &stock.TotalValue,
-			&stock.LocationId, &stock.PanelCode, &stock.RowNumber, &stock.RackCode, &stock.BatchNumber,
-			&stock.SupplierId, &stock.Status,
-			&stock.StockCheckedBy, &stock.StockCheckedAt,
-			&stock.CreatedAt, &stock.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
+		var row models.InventoryStockResponse
+		if err := rows.Scan(
+			&row.Id,
+			&row.MedicineID,
+			&row.MedicineName,
+			&row.BatchNumber,
+			&row.Quantity,
+			&row.ExpiryDate,
+			&row.Status,
+		); err != nil {
+			return nil, 0, err
 		}
-
-		inventory = append(inventory, stock)
+		data = append(data, row)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
+	// ---- get total count ----
+	countQuery, countArgs := buildStockCountQuery(f)
+	var total int
+	if err := db.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, err
 	}
 
-	return inventory, nil
+	return data, total, nil
 }
 
-func buildStockQuery(filters *models.InventoryStockFilters) (string, []interface{}) {
-	query := `
-        SELECT 
-            ist.id,
-            ist.medicine_id,
-            ist.batch_number,
-            ist.quantity,
-            ist.expiry_date,
-            ist.location_id,
-            ist.status
-    `
+func buildStockWhereClause(f *models.InventoryStockFilters) (string, []interface{}) {
+	var (
+		where  []string
+		args   []interface{}
+		argIdx = 1
+	)
 
-	if filters.IncludeMedicine != nil && *filters.IncludeMedicine {
-		query += `, m.name, m.generic_name, mc.name as category`
-	}
-
-	query += ` FROM inventory_stock ist`
-
-	joins := []string{}
-
-	if filters.IncludeMedicine != nil && *filters.IncludeMedicine {
-		joins = append(joins, `
-            LEFT JOIN medicines m ON ist.medicine_id = m.id
-            LEFT JOIN medicine_categories mc ON m.category_id = mc.id
-        `)
-	}
-
-	query += strings.Join(joins, " ")
-
-	where := []string{"1=1"}
-	args := []interface{}{}
-	argIdx := 1
-
-	if filters.MedicineID != nil {
+	if f.MedicineID != "" {
 		where = append(where, fmt.Sprintf("ist.medicine_id = $%d", argIdx))
-		args = append(args, *filters.MedicineID)
+		args = append(args, f.MedicineID)
 		argIdx++
 	}
 
-	if filters.BatchNumber != nil {
-		where = append(where, fmt.Sprintf("ist.batch_number = $%d", argIdx))
-		args = append(args, *filters.BatchNumber)
-		argIdx++
-	}
-
-	if filters.Status != nil {
+	if f.Status != "" {
 		where = append(where, fmt.Sprintf("ist.status = $%d", argIdx))
-		args = append(args, *filters.Status)
+		args = append(args, f.Status)
 		argIdx++
 	}
 
-	if filters.LocationID != nil {
-		where = append(where, fmt.Sprintf("ist.location_id = $%d", argIdx))
-		args = append(args, *filters.LocationID)
-		argIdx++
-	}
-
-	if filters.MinQuantity != nil {
-		where = append(where, fmt.Sprintf("ist.quantity >= $%d", argIdx))
-		args = append(args, *filters.MinQuantity)
-		argIdx++
-	}
-
-	if filters.MaxQuantity != nil {
+	if f.IsLowStock {
 		where = append(where, fmt.Sprintf("ist.quantity <= $%d", argIdx))
-		args = append(args, *filters.MaxQuantity)
+		args = append(args, 10) // LOW_STOCK_THRESHOLD
 		argIdx++
 	}
 
-	if filters.ExpiringWithinDays != nil {
-		where = append(where, fmt.Sprintf("ist.expiry_date <= NOW() + INTERVAL '%d days'", *filters.ExpiringWithinDays))
-	}
-
-	if filters.ExpiredOnly != nil && *filters.ExpiredOnly {
+	if f.ExpiredOnly {
 		where = append(where, "ist.expiry_date < NOW()")
 	}
 
-	if filters.ExpiryDateFrom != nil {
-		where = append(where, fmt.Sprintf("ist.expiry_date >= $%d", argIdx))
-		args = append(args, *filters.ExpiryDateFrom)
-		argIdx++
+	if f.ExpiringWithinDays > 0 {
+		where = append(
+			where,
+			fmt.Sprintf("ist.expiry_date <= NOW() + INTERVAL '%d days'", f.ExpiringWithinDays),
+		)
 	}
 
-	if filters.ExpiryDateTo != nil {
-		where = append(where, fmt.Sprintf("ist.expiry_date <= $%d", argIdx))
-		args = append(args, *filters.ExpiryDateTo)
-		argIdx++
+	if len(where) == 0 {
+		return "", args
 	}
 
-	query += " WHERE " + strings.Join(where, " AND ")
+	return " WHERE " + strings.Join(where, " AND "), args
+}
 
-	query += fmt.Sprintf(" ORDER BY %s %s", filters.SortBy, filters.SortOrder)
+func buildStockQuery(f *models.InventoryStockFilters) (string, []interface{}) {
+	whereSQL, args := buildStockWhereClause(f)
 
-	query += fmt.Sprintf(" LIMIT %d OFFSET %d",
-		filters.Limit,
-		(filters.Page-1)*filters.Limit,
+	query := `
+		SELECT
+			ist.id,
+			ist.medicine_id,
+			m.name,
+			ist.batch_number,
+			ist.quantity,
+			ist.expiry_date,
+			ist.status
+		FROM inventory_stock ist
+		LEFT JOIN medicines m ON ist.medicine_id = m.id
+	` + whereSQL
+
+	sortBy := "ist.created_at"
+	if f.SortBy == "quantity" {
+		sortBy = "ist.quantity"
+	}
+
+	sortOrder := "ASC"
+	if strings.ToUpper(f.SortOrder) == "DESC" {
+		sortOrder = "DESC"
+	}
+
+	if f.Page <= 0 {
+		f.Page = 1
+	}
+	if f.Limit <= 0 {
+		f.Limit = 20
+	}
+
+	query += fmt.Sprintf(
+		" ORDER BY %s %s LIMIT %d OFFSET %d",
+		sortBy,
+		sortOrder,
+		f.Limit,
+		(f.Page-1)*f.Limit,
 	)
 
 	return query, args
 }
+
+func buildStockCountQuery(f *models.InventoryStockFilters) (string, []interface{}) {
+	whereSQL, args := buildStockWhereClause(f)
+
+	query := `
+		SELECT COUNT(*)
+		FROM inventory_stock ist
+	` + whereSQL
+
+	return query, args
+}
+
+// func buildStockQuery(f *models.InventoryStockFilters) (string, []interface{}) {
+// 	var (
+// 		where  []string
+// 		args   []interface{}
+// 		argIdx = 1
+// 	)
+
+// 	query := `
+// 		SELECT
+// 			ist.id,
+// 			ist.medicine_id,
+// 			m.name AS medicine_name,
+// 			m.generic_name AS medicine_generic_name,
+// 			ist.batch_number,
+// 			ist.quantity,
+// 			ist.expiry_date,
+// 			ist.location_id,
+// 			l.name AS location_name,
+// 			ist.panel_code,
+// 			ist.row_number,
+// 			ist.rack_code,
+// 			ist.bin_number,
+// 			ist.status
+// 		FROM inventory_stock ist
+// 		LEFT JOIN medicines m ON ist.medicine_id = m.id
+// 		LEFT JOIN storage_locations l ON ist.location_id = l.id
+// 	`
+
+// 	// ---- filters ----
+
+// 	if f.MedicineID != "" {
+// 		where = append(where, fmt.Sprintf("ist.medicine_id = $%d", argIdx))
+// 		args = append(args, f.MedicineID)
+// 		argIdx++
+// 	}
+
+// 	if f.BatchNumber != "" {
+// 		where = append(where, fmt.Sprintf("ist.batch_number = $%d", argIdx))
+// 		args = append(args, f.BatchNumber)
+// 		argIdx++
+// 	}
+
+// 	if f.Status != "" {
+// 		where = append(where, fmt.Sprintf("ist.status = $%d", argIdx))
+// 		args = append(args, f.Status)
+// 		argIdx++
+// 	}
+
+// 	if f.LocationID != "" {
+// 		where = append(where, fmt.Sprintf("ist.location_id = $%d", argIdx))
+// 		args = append(args, f.LocationID)
+// 		argIdx++
+// 	}
+
+// 	if f.MinQuantity > 0 {
+// 		where = append(where, fmt.Sprintf("ist.quantity >= $%d", argIdx))
+// 		args = append(args, f.MinQuantity)
+// 		argIdx++
+// 	}
+
+// 	if f.MaxQuantity > 0 {
+// 		where = append(where, fmt.Sprintf("ist.quantity <= $%d", argIdx))
+// 		args = append(args, f.MaxQuantity)
+// 		argIdx++
+// 	}
+
+// 	if f.IsLowStock {
+// 		where = append(where, fmt.Sprintf("ist.quantity <= $%d", argIdx))
+// 		args = append(args, 10) // LOW_STOCK_THRESHOLD
+// 		argIdx++
+// 	}
+
+// 	if f.ExpiringWithinDays > 0 {
+// 		where = append(where,
+// 			fmt.Sprintf("ist.expiry_date <= NOW() + INTERVAL '%d days'", f.ExpiringWithinDays),
+// 		)
+// 	}
+
+// 	if f.ExpiredOnly {
+// 		where = append(where, "ist.expiry_date < NOW()")
+// 	}
+
+// 	if f.ExpiryDateFrom != "" {
+// 		where = append(where, fmt.Sprintf("ist.expiry_date >= $%d", argIdx))
+// 		args = append(args, f.ExpiryDateFrom)
+// 		argIdx++
+// 	}
+
+// 	if f.ExpiryDateTo != "" {
+// 		where = append(where, fmt.Sprintf("ist.expiry_date <= $%d", argIdx))
+// 		args = append(args, f.ExpiryDateTo)
+// 		argIdx++
+// 	}
+
+// 	if len(where) > 0 {
+// 		query += " WHERE " + strings.Join(where, " AND ")
+// 	}
+
+// 	// ---- sorting (WHITELISTED) ----
+
+// 	sortMap := map[string]string{
+// 		"created_at": "ist.created_at",
+// 		"quantity":   "ist.quantity",
+// 		"expiry":     "ist.expiry_date",
+// 		"status":     "ist.status",
+// 	}
+
+// 	sortBy := sortMap[f.SortBy]
+// 	if sortBy == "" {
+// 		sortBy = "ist.created_at"
+// 	}
+
+// 	sortOrder := "ASC"
+// 	if strings.ToUpper(f.SortOrder) == "DESC" {
+// 		sortOrder = "DESC"
+// 	}
+
+// 	query += fmt.Sprintf(" ORDER BY %s %s", sortBy, sortOrder)
+
+// 	// ---- pagination ----
+
+// 	if f.Limit <= 0 {
+// 		f.Limit = 20
+// 	}
+// 	if f.Page <= 0 {
+// 		f.Page = 1
+// 	}
+
+// 	query += fmt.Sprintf(
+// 		" LIMIT %d OFFSET %d",
+// 		f.Limit,
+// 		(f.Page-1)*f.Limit,
+// 	)
+
+// 	return query, args
+// }

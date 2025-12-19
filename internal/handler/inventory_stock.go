@@ -99,11 +99,11 @@ func (i *InventoryStockHandler) GetStock(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	stock, err := i.InventoryStock.GetInventoryStockWithFiltersService(ctx, &filters)
+	stock, total, err := i.InventoryStock.GetInventoryStockWithFiltersService(ctx, &filters)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": stock})
+	c.JSON(http.StatusOK, gin.H{"data": stock, "total": total})
 }

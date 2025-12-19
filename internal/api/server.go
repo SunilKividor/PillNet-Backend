@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/SunilKividor/PillNet-Backend/internal/authentication/http/middleware"
 	"github.com/SunilKividor/PillNet-Backend/internal/config"
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +18,7 @@ func NewServer(cfg *config.Config) *Server {
 
 	engine := gin.New()
 	engine.Use(gin.Logger())
+	engine.Use(middleware.CORSMiddleware())
 
 	s := &Server{
 		Port:   cfg.ServerConfig.Port,

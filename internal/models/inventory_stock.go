@@ -41,31 +41,49 @@ type InventoryStock struct {
 }
 
 type InventoryStockFilters struct {
-	Page  int `form:"page" default:"1"`
-	Limit int `form:"limit" default:"20"`
+	// pagination
+	Page  int `form:"page"`
+	Limit int `form:"limit"`
 
-	MedicineID  *string `form:"medicine_id"`
-	BatchNumber *string `form:"batch_number"`
-	LocationID  *string `form:"location_id"`
-	Status      *string `form:"status"`
+	// exact filters
+	MedicineID  string `form:"medicine_id"`
+	BatchNumber string `form:"batch_number"`
+	LocationID  string `form:"location_id"`
+	Status      string `form:"status"`
 
-	ABCClass *string `form:"abc_class"`
-	VEDClass *string `form:"ved_class"`
-	Category *string `form:"category"`
+	// quantity
+	MinQuantity int  `form:"min_quantity"`
+	MaxQuantity int  `form:"max_quantity"`
+	IsLowStock  bool `form:"is_low_stock"`
 
-	MinQuantity *int  `form:"min_quantity"`
-	MaxQuantity *int  `form:"max_quantity"`
-	IsLowStock  *bool `form:"is_low_stock"`
+	// expiry
+	ExpiringWithinDays int    `form:"expiring_within_days"`
+	ExpiredOnly        bool   `form:"expired_only"`
+	ExpiryDateFrom     string `form:"expiry_date_from"` // YYYY-MM-DD
+	ExpiryDateTo       string `form:"expiry_date_to"`   // YYYY-MM-DD
 
-	ExpiringWithinDays *int    `form:"expiring_within_days"`
-	ExpiredOnly        *bool   `form:"expired_only"`
-	ExpiryDateFrom     *string `form:"expiry_date_from"`
-	ExpiryDateTo       *string `form:"expiry_date_to"`
+	// sorting
+	SortBy    string `form:"sort_by"`
+	SortOrder string `form:"sort_order"`
+}
 
-	SortBy    string `form:"sort_by" default:"name"`
-	SortOrder string `form:"sort_order" default:"asc"`
+type InventoryStockResponse struct {
+	Id                  string `json:"id"`
+	MedicineID          string `json:"medicine_id"`
+	MedicineName        string `json:"medicine_name"`
+	MedicineGenericName string `json:"medicine_generic_name"`
 
-	IncludeBatches      *bool `form:"include_batches"`
-	IncludeTransactions *bool `form:"include_transactions"`
-	IncludeMedicine     *bool `form:"include_medicine"`
+	BatchNumber string         `json:"batch_number"`
+	Quantity    pgtype.Numeric `json:"quantity"`
+	ExpiryDate  time.Time      `json:"expiry_date"`
+
+	LocationID   string `json:"location_id"`
+	LocationName string `json:"location_name"`
+
+	PanelCode string         `json:"panel_code"`
+	RowNumber pgtype.Numeric `json:"row_number"`
+	RackCode  string         `json:"rack_code"`
+	BinNumber pgtype.Numeric `json:"bin_number"`
+
+	Status string `json:"status"`
 }
