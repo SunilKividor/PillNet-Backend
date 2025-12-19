@@ -1,0 +1,3 @@
+add inventory filters more - invntory_stock_repo
+
+add alerts logic as a separate service

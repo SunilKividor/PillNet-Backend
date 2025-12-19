@@ -39,3 +39,8 @@ func (s *InventoryStockService) DeleteInventoryStockByIdService(ctx context.Cont
 	err := s.InventoryStockRepo.DeleteInventoryStockById(ctx, s.DB, id)
 	return err
 }
+
+func (s *InventoryStockService) GetInventoryStockWithFiltersService(ctx context.Context, filters *models.InventoryStockFilters) ([]models.InventoryStock, error) {
+	stock, err := s.InventoryStockRepo.GetInventoryStockWithFilters(ctx, s.DB, filters)
+	return stock, err
+}

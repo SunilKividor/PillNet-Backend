@@ -34,3 +34,8 @@ func (s *ManufacturerService) GetManufacturerByIDService(ctx context.Context, id
 	manufacturer, err := s.ManfacturerRepo.GetManufacturerByID(ctx, s.DB, id)
 	return manufacturer, err
 }
+
+func (s *ManufacturerService) DeleteManufacturerByIDService(ctx context.Context, id string) error {
+	err := s.ManfacturerRepo.DeleteManufacturerByID(ctx, s.DB, id)
+	return err
+}

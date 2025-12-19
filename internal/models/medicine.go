@@ -52,6 +52,6 @@ type MedicineCategory struct {
 	Id             string    `db:"id" json:"id"`
 	Name           string    `db:"name" json:"name"`
 	Description    string    `db:"description" json:"description"`
-	ParentCategory string    `db:"parent_category" json:"parent_category"`
+	ParentCategory *string   `db:"parent_category" json:"parent_category"`
 	CreatedAt      time.Time `db:"created_at" json:"created_at"`
 }

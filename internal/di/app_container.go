@@ -9,6 +9,7 @@ import (
 	redisdb "github.com/SunilKividor/PillNet-Backend/internal/db/redis"
 	"github.com/SunilKividor/PillNet-Backend/internal/db/repository"
 	"github.com/SunilKividor/PillNet-Backend/internal/handler"
+	"github.com/SunilKividor/PillNet-Backend/internal/service"
 )
 
 func InitializeApp() (*api.Server, error) {
@@ -33,8 +34,28 @@ func InitializeApp() (*api.Server, error) {
 	jwtRepo := repository.NewAuthRepository(pool, redisClient)
 	jwtAuth := jwt.NewJWTAuthenticationClient(jwtRepo, cfg.JWTConfig.Secret)
 
+	inventoryTransactionRepo := repository.NewInventoryTransactionRepository()
+	inventoryStockRepo := repository.NewInventoryStockRepository()
+	manufacturerRepo := repository.NewManufacturersRepository()
+	medicineCategoryRepo := repository.NewMedicinesCategoryRepository()
+	medicineRepo := repository.NewMedicinesRepository()
+	storageLocationRepo := repository.NewStorageLocationRepository()
+
+	inventoryTransactionService := service.NewInventoryTransactionService(pool, inventoryTransactionRepo)
+	inventoryStockService := service.NewInventoryStockService(pool, inventoryStockRepo)
+	manufacturerSercvice := service.NewManufacturerService(pool, manufacturerRepo)
+	medicineCategoryService := service.NewMedicineCategoryService(pool, medicineCategoryRepo)
+	medicineService := service.NewMedicineService(pool, medicineRepo, medicineCategoryRepo, manufacturerRepo)
+	storageLocationService := service.NewStorageLocationService(pool, storageLocationRepo)
+
 	handlers := &handler.Handlers{
-		Authentication: handler.NewAuthenticationHandler(jwtAuth),
+		Authentication:       handler.NewAuthenticationHandler(jwtAuth),
+		InventoryStock:       handler.NewInventoryStockHandler(inventoryStockService),
+		InventoryTransaction: handler.NewInventoryTransactionHandler(inventoryTransactionService),
+		Manufacturers:        handler.NewManufacturersHandler(manufacturerSercvice),
+		MedicineCategory:     handler.NewMedicineCategoryHandler(medicineCategoryService),
+		Medicines:            handler.NewMedicinesHandler(medicineService),
+		StorageLocation:      handler.NewStorageLocationHandler(storageLocationService),
 	}
 	middleware := middleware.JWTMiddleware()
 

@@ -39,3 +39,33 @@ type InventoryStock struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
+
+type InventoryStockFilters struct {
+	Page  int `form:"page" default:"1"`
+	Limit int `form:"limit" default:"20"`
+
+	MedicineID  *string `form:"medicine_id"`
+	BatchNumber *string `form:"batch_number"`
+	LocationID  *string `form:"location_id"`
+	Status      *string `form:"status"`
+
+	ABCClass *string `form:"abc_class"`
+	VEDClass *string `form:"ved_class"`
+	Category *string `form:"category"`
+
+	MinQuantity *int  `form:"min_quantity"`
+	MaxQuantity *int  `form:"max_quantity"`
+	IsLowStock  *bool `form:"is_low_stock"`
+
+	ExpiringWithinDays *int    `form:"expiring_within_days"`
+	ExpiredOnly        *bool   `form:"expired_only"`
+	ExpiryDateFrom     *string `form:"expiry_date_from"`
+	ExpiryDateTo       *string `form:"expiry_date_to"`
+
+	SortBy    string `form:"sort_by" default:"name"`
+	SortOrder string `form:"sort_order" default:"asc"`
+
+	IncludeBatches      *bool `form:"include_batches"`
+	IncludeTransactions *bool `form:"include_transactions"`
+	IncludeMedicine     *bool `form:"include_medicine"`
+}
