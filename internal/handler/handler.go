@@ -9,4 +9,5 @@ type Handlers struct {
 	Medicines            *MedicinesHandler
 	StorageLocation      *StorageLocationHandler
 	Alert                *AlertsHandler
+	Dashboard            *DashboardHandler
 }

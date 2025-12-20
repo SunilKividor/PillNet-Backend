@@ -2,6 +2,10 @@ package service
 
 import (
 	"context"
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"time"
 
 	"github.com/SunilKividor/PillNet-Backend/internal/db/repository"
 	"github.com/SunilKividor/PillNet-Backend/internal/models"
@@ -18,6 +22,45 @@ func NewInventoryStockService(db *pgxpool.Pool, inventoryStockRepo *repository.I
 		DB:                 db,
 		InventoryStockRepo: inventoryStockRepo,
 	}
+}
+
+// GetDemandForecast calls the Python AI Engine to get demand predictions
+func (s *InventoryStockService) GetDemandForecast(ctx context.Context, medicineID string) (interface{}, error) {
+	// Simple HTTP call to Python Service
+	// In production, use a proper client with timeouts and config
+	url := "http://localhost:8000/predict"
+	payload := map[string]interface{}{
+		"medicine_id": medicineID,
+		"history": []map[string]interface{}{
+			// Mock history for now, or fetch from TransactionRepo!
+			{"date": "2023-01-01", "quantity": 10},
+			{"date": "2023-01-02", "quantity": 12},
+			{"date": "2023-01-03", "quantity": 15},
+			{"date": "2023-01-04", "quantity": 14},
+			{"date": "2023-01-05", "quantity": 20},
+		},
+	}
+	
+	jsonBytes, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (s *InventoryStockService) CreateInventoryStockService(ctx context.Context, stock models.InventoryStock) (string, error) {

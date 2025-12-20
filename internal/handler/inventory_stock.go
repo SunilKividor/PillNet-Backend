@@ -107,3 +107,19 @@ func (i *InventoryStockHandler) GetStock(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"data": stock, "total": total})
 }
+
+func (i *InventoryStockHandler) GetForecast(c *gin.Context) {
+	medicineID := c.Param("medicine_id")
+	if medicineID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "medicine_id is required"})
+		return
+	}
+
+	result, err := i.InventoryStock.GetDemandForecast(c.Request.Context(), medicineID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}

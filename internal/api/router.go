@@ -54,6 +54,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, handlers *handler.Handler
 		authRequired.GET("/inventory/stock", handlers.InventoryStock.GetInventoryStockById)
 		authRequired.DELETE("/inventory/stock", handlers.InventoryStock.DeleteInventoryStockById)
 		authRequired.GET("/inventory/stocks", handlers.InventoryStock.GetStock)
+		authRequired.GET("/inventory/forecast/:medicine_id", handlers.InventoryStock.GetForecast)
 
 		//inventory-tranaction
 		authRequired.POST("/inventory/transaction", handlers.InventoryTransaction.CreateInventoryTransaction)
@@ -65,5 +66,8 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, handlers *handler.Handler
 		authRequired.POST("/alerts", handlers.Alert.CreateAlert)
 		authRequired.GET("/alerts", handlers.Alert.GetAlerts)
 		authRequired.DELETE("/alerts", handlers.Alert.DeleteAlertByID)
+
+		//dashboard
+		authRequired.GET("/dashboard/stats", handlers.Dashboard.GetDashboardStats)
 	}
 }

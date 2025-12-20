@@ -1,11 +1,10 @@
 -- +goose Up
 -- +goose StatementBegin
-ALTER TABLE medicines
-RENAME COLUMN category TO category_id;
+-- FLAGGED AS REDUNDANT: ALTER TABLE medicines RENAME COLUMN category TO category_id;
+SELECT 1;
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
-ALTER TABLE medicines
-RENAME COLUMN category_id TO category;
+SELECT 1;
 -- +goose StatementEnd

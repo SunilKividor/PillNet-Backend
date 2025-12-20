@@ -278,6 +278,84 @@ func buildStockCountQuery(f *models.InventoryStockFilters) (string, []interface{
 	return query, args
 }
 
+func (r *InventoryStockRepository) GetDashboardStats(ctx context.Context, db DBTX) (*models.DashboardStats, error) {
+	stats := &models.DashboardStats{}
+
+	// 1. Total Inventory Value (Sum of quantity * unit_cost_price)
+	err := db.QueryRow(ctx, `
+		SELECT COALESCE(SUM(quantity * unit_cost_price), 0)
+		FROM inventory_stock
+	`).Scan(&stats.TotalInventoryValue)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Total Items
+	err = db.QueryRow(ctx, `SELECT COUNT(*) FROM inventory_stock`).Scan(&stats.TotalItems)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Low Stock Items (quantity <= 10)
+	err = db.QueryRow(ctx, `SELECT COUNT(*) FROM inventory_stock WHERE quantity <= 10`).Scan(&stats.LowStockItems)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Expired Items
+	err = db.QueryRow(ctx, `SELECT COUNT(*) FROM inventory_stock WHERE expiry_date < NOW()`).Scan(&stats.ExpiredItems)
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. Near Expiry Items (within 30 days)
+	err = db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM inventory_stock 
+		WHERE expiry_date >= NOW() AND expiry_date <= NOW() + INTERVAL '30 days'
+	`).Scan(&stats.NearExpiryItems)
+	if err != nil {
+		return nil, err
+	}
+
+	// 6. Status Distribution
+	rows, err := db.Query(ctx, `SELECT status, COUNT(*) FROM inventory_stock GROUP BY status`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err == nil {
+			stats.StatusDistribution = append(stats.StatusDistribution, models.ChartData{Label: status, Value: count})
+		}
+	}
+
+	// 7. Expiry Distribution (Monthly)
+	// Postgres: TO_CHAR(expiry_date, 'YYYY-MM')
+	rows2, err := db.Query(ctx, `
+		SELECT TO_CHAR(expiry_date, 'YYYY-MM') as month, COUNT(*) 
+		FROM inventory_stock 
+		WHERE expiry_date IS NOT NULL 
+		GROUP BY month 
+		ORDER BY month ASC
+	`)
+	if err != nil {
+		// Log error but don't fail entire request? or return error
+		return nil, err
+	}
+	defer rows2.Close()
+	for rows2.Next() {
+		var label string
+		var value int
+		if err := rows2.Scan(&label, &value); err == nil {
+			stats.ExpiryDistribution = append(stats.ExpiryDistribution, models.ChartData{Label: label, Value: value})
+		}
+	}
+
+	return stats, nil
+}
+
 // func buildStockQuery(f *models.InventoryStockFilters) (string, []interface{}) {
 // 	var (
 // 		where  []string
